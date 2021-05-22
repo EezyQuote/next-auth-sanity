@@ -4,11 +4,12 @@ import {
   getUserByIdQuery,
   getUserByProviderAccountIdQuery,
   getUserByEmailQuery,
+  getVerificationRequestQuery,
 } from './queries';
 import LRU from 'lru-cache';
 import { SanityClient } from '@sanity/client';
 import { uuid } from '@sanity/uuid';
-import { createHash, randomBytes } from 'crypto';
+import { createHash } from 'crypto';
 
 type Options = {
   client: SanityClient;
@@ -158,14 +159,14 @@ export const SanityAdapter = ({ client }: Options) => {
     }
 
     async function createVerificationRequest(
-      identifier,
-      url,
-      token,
-      _,
-      provider
+      identifier: string,
+      url: string,
+      token: string,
+      _: any,
+      provider: any
     ) {
       await client.create({
-        _type: 'session-verification',
+        _type: 'verification-request',
         identifier,
         token: hashToken(token),
         expires: new Date(Date.now() + provider.maxAge * 1000),
@@ -180,13 +181,16 @@ export const SanityAdapter = ({ client }: Options) => {
       });
     }
 
-    async function getVerificationRequest(identifier, token) {
+    async function getVerificationRequest(identifier = '', token = '') {
       const hashedToken = hashToken(token);
 
-      const verificationRequest = await client.fetch(getUserByEmailQuery, {
-        identifier,
-        token: hashedToken,
-      });
+      const verificationRequest = await client.fetch(
+        getVerificationRequestQuery,
+        {
+          identifier,
+          token: hashedToken,
+        }
+      );
 
       if (verificationRequest && verificationRequest.expires < new Date()) {
         await client.delete(verificationRequest._id);
@@ -196,15 +200,20 @@ export const SanityAdapter = ({ client }: Options) => {
       return verificationRequest;
     }
 
-    async function deleteVerificationRequest(identifier, token) {
+    async function deleteVerificationRequest(identifier = '', token = '') {
       const hashedToken = hashToken(token);
 
-      const verificationRequest = await client.fetch(getUserByEmailQuery, {
-        identifier,
-        token: hashedToken,
-      });
+      const verificationRequest = await client.fetch(
+        getVerificationRequestQuery,
+        {
+          identifier,
+          token: hashedToken,
+        }
+      );
 
-      await client.delete(verificationRequest._id);
+      if (verificationRequest._id) {
+        await client.delete(verificationRequest._id);
+      }
     }
 
     return {

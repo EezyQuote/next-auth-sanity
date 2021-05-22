@@ -117,7 +117,7 @@ const SanityAdapter = ({ client }) => {
         }
         async function createVerificationRequest(identifier, url, token, _, provider) {
             await client.create({
-                _type: 'session-verification',
+                _type: 'verification-request',
                 identifier,
                 token: hashToken(token),
                 expires: new Date(Date.now() + provider.maxAge * 1000),
@@ -130,9 +130,9 @@ const SanityAdapter = ({ client }) => {
                 provider,
             });
         }
-        async function getVerificationRequest(identifier, token) {
+        async function getVerificationRequest(identifier = '', token = '') {
             const hashedToken = hashToken(token);
-            const verificationRequest = await client.fetch(queries_1.getUserByEmailQuery, {
+            const verificationRequest = await client.fetch(queries_1.getVerificationRequestQuery, {
                 identifier,
                 token: hashedToken,
             });
@@ -142,13 +142,15 @@ const SanityAdapter = ({ client }) => {
             }
             return verificationRequest;
         }
-        async function deleteVerificationRequest(identifier, token) {
+        async function deleteVerificationRequest(identifier = '', token = '') {
             const hashedToken = hashToken(token);
-            const verificationRequest = await client.fetch(queries_1.getUserByEmailQuery, {
+            const verificationRequest = await client.fetch(queries_1.getVerificationRequestQuery, {
                 identifier,
                 token: hashedToken,
             });
-            await client.delete(verificationRequest._id);
+            if (verificationRequest._id) {
+                await client.delete(verificationRequest._id);
+            }
         }
         return {
             createUser,
