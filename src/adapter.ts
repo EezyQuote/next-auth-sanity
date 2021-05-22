@@ -3,11 +3,12 @@ import { User } from 'next-auth';
 import {
   getUserByIdQuery,
   getUserByProviderAccountIdQuery,
-  getUserByEmailQuery
+  getUserByEmailQuery,
 } from './queries';
 import LRU from 'lru-cache';
 import { SanityClient } from '@sanity/client';
 import { uuid } from '@sanity/uuid';
+import { createHash, randomBytes } from 'crypto';
 
 type Options = {
   client: SanityClient;
@@ -15,28 +16,35 @@ type Options = {
 
 const userCache = new LRU<string, User & { id: string }>({
   maxAge: 24 * 60 * 60 * 1000,
-  max: 1000
+  max: 1000,
 });
 
 export const SanityAdapter = ({ client }: Options) => {
-  const getAdapter = async () => {
+  const getAdapter = async ({
+    secret = 'this-is-a-secret-value-with-at-least-32-characters',
+    ...appOptions
+  }) => {
+    const hashToken = (token: string) => {
+      return createHash('sha256').update(`${token}${secret}`).digest('hex');
+    };
+
     async function createUser(profile: Profile): Promise<User> {
       const user = await client.create({
         _id: `user.${uuid()}`,
         _type: 'user',
         email: profile.email,
         name: profile.name,
-        image: profile.image
+        image: profile.image,
       });
 
       userCache.set(user._id, {
         id: user._id,
-        ...user
+        ...user,
       });
 
       return {
         id: user._id,
-        ...user
+        ...user,
       };
     }
 
@@ -46,12 +54,12 @@ export const SanityAdapter = ({ client }: Options) => {
       if (cachedUser) {
         (async () => {
           const user = await client.fetch(getUserByIdQuery, {
-            id
+            id,
           });
 
           userCache.set(user._id, {
             id: user._id,
-            ...user
+            ...user,
           });
         })();
 
@@ -59,12 +67,12 @@ export const SanityAdapter = ({ client }: Options) => {
       }
 
       const user = await client.fetch(getUserByIdQuery, {
-        id
+        id,
       });
 
       return {
         id: user._id,
-        ...user
+        ...user,
       };
     }
 
@@ -87,8 +95,8 @@ export const SanityAdapter = ({ client }: Options) => {
         accessTokenExpires,
         user: {
           _type: 'reference',
-          _ref: userId
-        }
+          _ref: userId,
+        },
       });
     }
 
@@ -98,7 +106,7 @@ export const SanityAdapter = ({ client }: Options) => {
     ) {
       const account = await client.fetch(getUserByProviderAccountIdQuery, {
         providerId,
-        providerAccountId: String(providerAccountId)
+        providerAccountId: String(providerAccountId),
       });
 
       return account?.user;
@@ -106,7 +114,7 @@ export const SanityAdapter = ({ client }: Options) => {
 
     async function getUserByEmail(email: string) {
       const user = await client.fetch(getUserByEmailQuery, {
-        email
+        email,
       });
 
       return user;
@@ -139,14 +147,64 @@ export const SanityAdapter = ({ client }: Options) => {
         .set({
           name,
           email,
-          image
+          image,
         })
         .commit();
 
       return {
         id: newUser._id,
-        ...newUser
+        ...newUser,
       };
+    }
+
+    async function createVerificationRequest(
+      identifier,
+      url,
+      token,
+      _,
+      provider
+    ) {
+      await client.create({
+        _type: 'session-verification',
+        identifier,
+        token: hashToken(token),
+        expires: new Date(Date.now() + provider.maxAge * 1000),
+      });
+
+      await provider.sendVerificationRequest({
+        identifier,
+        url,
+        token,
+        baseUrl: appOptions.baseUrl,
+        provider,
+      });
+    }
+
+    async function getVerificationRequest(identifier, token) {
+      const hashedToken = hashToken(token);
+
+      const verificationRequest = await client.fetch(getUserByEmailQuery, {
+        identifier,
+        token: hashedToken,
+      });
+
+      if (verificationRequest && verificationRequest.expires < new Date()) {
+        await client.delete(verificationRequest._id);
+        return null;
+      }
+
+      return verificationRequest;
+    }
+
+    async function deleteVerificationRequest(identifier, token) {
+      const hashedToken = hashToken(token);
+
+      const verificationRequest = await client.fetch(getUserByEmailQuery, {
+        identifier,
+        token: hashedToken,
+      });
+
+      await client.delete(verificationRequest._id);
     }
 
     return {
@@ -159,11 +217,14 @@ export const SanityAdapter = ({ client }: Options) => {
       getSession,
       updateSession,
       deleteSession,
-      updateUser
+      updateUser,
+      createVerificationRequest,
+      getVerificationRequest,
+      deleteVerificationRequest,
     };
   };
 
   return {
-    getAdapter
+    getAdapter,
   };
 };

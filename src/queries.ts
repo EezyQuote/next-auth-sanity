@@ -18,3 +18,7 @@ export const getUserByProviderAccountIdQuery = groq`
 export const getUserByEmailQuery = groq`
   *[_type == 'user' && email == $email][0]
 `;
+
+export const getSessionVerificationQuery = groq`
+  *[_type == 'session-verification' && identifier == $identifier && token == $token][0]
+`;
