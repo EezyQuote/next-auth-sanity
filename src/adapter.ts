@@ -105,18 +105,37 @@ export const SanityAdapter = ({ client }: Options) => {
       providerId: string,
       providerAccountId: string
     ) {
-      const account = await client.fetch(getUserByProviderAccountIdQuery, {
-        providerId,
-        providerAccountId: String(providerAccountId),
-      });
+      const account = await client
+        .fetch(getUserByProviderAccountIdQuery, {
+          providerId,
+          providerAccountId: String(providerAccountId),
+        })
+        .then((res) => {
+          if (!res) return res;
+          return {
+            ...res,
+            user: {
+              ...res.user,
+              id: res?.user?._id,
+            },
+          };
+        });
 
       return account?.user;
     }
 
     async function getUserByEmail(email: string) {
-      const user = await client.fetch(getUserByEmailQuery, {
-        email,
-      });
+      const user = await client
+        .fetch(getUserByEmailQuery, {
+          email,
+        })
+        .then((res) => {
+          if (!res) return res;
+          return {
+            ...res,
+            id: res._id,
+          };
+        });
 
       return user;
     }
@@ -143,19 +162,20 @@ export const SanityAdapter = ({ client }: Options) => {
 
       userCache.set(id, user);
 
-      const newUser = await client
+      return await client
         .patch(id)
         .set({
           name,
           email,
           image,
         })
-        .commit();
-
-      return {
-        id: newUser._id,
-        ...newUser,
-      };
+        .commit()
+        .then((res) => {
+          return {
+            id: res._id,
+            ...res,
+          };
+        });
     }
 
     async function createVerificationRequest(
