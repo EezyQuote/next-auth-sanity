@@ -26,12 +26,12 @@ const SanityAdapter = ({ client }) => {
                 image: profile.image,
             });
             userCache.set(user._id, {
-                id: user._id,
                 ...user,
+                id: user._id,
             });
             return {
-                id: user._id,
                 ...user,
+                id: user._id,
             };
         }
         async function getUser(id) {
@@ -42,8 +42,8 @@ const SanityAdapter = ({ client }) => {
                         id,
                     });
                     userCache.set(user._id, {
-                        id: user._id,
                         ...user,
+                        id: user._id,
                     });
                 })();
                 return cachedUser;
@@ -52,8 +52,8 @@ const SanityAdapter = ({ client }) => {
                 id,
             });
             return {
-                id: user._id,
                 ...user,
+                id: user._id,
             };
         }
         async function linkAccount(userId, providerId, providerType, providerAccountId, refreshToken, accessToken, accessTokenExpires) {
@@ -72,15 +72,37 @@ const SanityAdapter = ({ client }) => {
             });
         }
         async function getUserByProviderAccountId(providerId, providerAccountId) {
-            const account = await client.fetch(queries_1.getUserByProviderAccountIdQuery, {
+            const account = await client
+                .fetch(queries_1.getUserByProviderAccountIdQuery, {
                 providerId,
                 providerAccountId: String(providerAccountId),
+            })
+                .then((res) => {
+                var _a;
+                if (!res)
+                    return res;
+                return {
+                    ...res,
+                    user: {
+                        ...res.user,
+                        id: (_a = res === null || res === void 0 ? void 0 : res.user) === null || _a === void 0 ? void 0 : _a._id,
+                    },
+                };
             });
             return account === null || account === void 0 ? void 0 : account.user;
         }
         async function getUserByEmail(email) {
-            const user = await client.fetch(queries_1.getUserByEmailQuery, {
+            const user = await client
+                .fetch(queries_1.getUserByEmailQuery, {
                 email,
+            })
+                .then((res) => {
+                if (!res)
+                    return res;
+                return {
+                    ...res,
+                    id: res._id,
+                };
             });
             return user;
         }
@@ -102,18 +124,20 @@ const SanityAdapter = ({ client }) => {
         async function updateUser(user) {
             const { id, name, email, image } = user;
             userCache.set(id, user);
-            const newUser = await client
+            return await client
                 .patch(id)
                 .set({
                 name,
                 email,
                 image,
             })
-                .commit();
-            return {
-                id: newUser._id,
-                ...newUser,
-            };
+                .commit()
+                .then((res) => {
+                return {
+                    ...res,
+                    id: res._id,
+                };
+            });
         }
         async function createVerificationRequest(identifier, url, token, _, provider) {
             await client.create({

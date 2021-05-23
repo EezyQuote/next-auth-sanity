@@ -39,13 +39,13 @@ export const SanityAdapter = ({ client }: Options) => {
       });
 
       userCache.set(user._id, {
-        id: user._id,
         ...user,
+        id: user._id,
       });
 
       return {
-        id: user._id,
         ...user,
+        id: user._id,
       };
     }
 
@@ -59,8 +59,8 @@ export const SanityAdapter = ({ client }: Options) => {
           });
 
           userCache.set(user._id, {
-            id: user._id,
             ...user,
+            id: user._id,
           });
         })();
 
@@ -72,8 +72,8 @@ export const SanityAdapter = ({ client }: Options) => {
       });
 
       return {
-        id: user._id,
         ...user,
+        id: user._id,
       };
     }
 
@@ -172,8 +172,8 @@ export const SanityAdapter = ({ client }: Options) => {
         .commit()
         .then((res) => {
           return {
-            id: res._id,
             ...res,
+            id: res._id,
           };
         });
     }
