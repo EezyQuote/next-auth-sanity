@@ -22,3 +22,7 @@ export const getUserByEmailQuery = groq`
 export const getVerificationRequestQuery = groq`
   *[_type == 'verification-request' && identifier == $identifier && token == $token][0]
 `;
+
+export const getSessionBySessionToken = groq`
+  *[_type == 'session' && sessionToken == $sessionToken][0]
+`;

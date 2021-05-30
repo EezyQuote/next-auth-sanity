@@ -5,11 +5,12 @@ import {
   getUserByProviderAccountIdQuery,
   getUserByEmailQuery,
   getVerificationRequestQuery,
+  getSessionBySessionToken,
 } from './queries';
 import LRU from 'lru-cache';
 import { SanityClient } from '@sanity/client';
 import { uuid } from '@sanity/uuid';
-import { createHash } from 'crypto';
+import { createHash, randomBytes } from 'crypto';
 
 type Options = {
   client: SanityClient;
@@ -22,9 +23,13 @@ const userCache = new LRU<string, User & { id: string }>({
 
 export const SanityAdapter = ({ client }: Options) => {
   const getAdapter = async ({
+    session,
     secret = 'this-is-a-secret-value-with-at-least-32-characters',
     ...appOptions
   }) => {
+    const sessionMaxAge = session.maxAge * 1000; // default is 30 days
+    const sessionUpdateAge = session.updateAge * 1000; // default is 1 day
+
     const hashToken = (token: string) => {
       return createHash('sha256').update(`${token}${secret}`).digest('hex');
     };
@@ -140,21 +145,57 @@ export const SanityAdapter = ({ client }: Options) => {
       return user;
     }
 
-    async function createSession(): Promise<Session> {
-      console.log('[createSession] method not implemented');
+    function createSession(user): Promise<Session> {
+      return client
+        .create({
+          _type: 'session',
+          userId: user.id,
+          expires: new Date(Date.now() + sessionMaxAge),
+          sessionToken: randomBytes(32).toString('hex'),
+          accessToken: randomBytes(32).toString('hex'),
+        })
+        .then((res) => ({ ...res, id: res._id }));
+    }
 
-      return {} as any;
+    async function getSession(sessionToken): Promise<Session | null> {
+      const session = await client
+        .fetch(getSessionBySessionToken, {
+          sessionToken,
+        })
+        .then((res) => ({ ...res, id: res._id }));
+      if (session && session.expires < new Date()) {
+        await client.delete(session.id);
+        return null;
+      }
+      return session;
     }
-    async function getSession(): Promise<Session> {
-      console.log('[getSession] method not implemented');
-      return {} as any;
+
+    async function updateSession(session, force): Promise<Session | null> {
+      if (
+        !force &&
+        Number(session.expires) - sessionMaxAge + sessionUpdateAge > Date.now()
+      ) {
+        return null;
+      }
+
+      return client
+        .patch(session.id)
+        .set({ expires: new Date(Date.now() + sessionMaxAge) })
+        .commit()
+        .then((res) => {
+          return {
+            ...res,
+            id: res._id,
+          } as any;
+        });
     }
-    async function updateSession(): Promise<Session> {
-      console.log('[updateSession] method not implemented');
-      return {} as any;
-    }
-    async function deleteSession() {
-      console.log('[deleteSession] method not implemented');
+
+    async function deleteSession(sessionToken) {
+      await client
+        .fetch(getSessionBySessionToken, { sessionToken })
+        .then(async (res) => {
+          await client.delete(res._id);
+        });
     }
 
     async function updateUser(user: User & { id: string }): Promise<User> {
