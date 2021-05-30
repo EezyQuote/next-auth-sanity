@@ -5,8 +5,9 @@ declare type Options = {
     client: SanityClient;
 };
 export declare const SanityAdapter: ({ client }: Options) => {
-    getAdapter: ({ secret, ...appOptions }: {
+    getAdapter: ({ session, secret, ...appOptions }: {
         [x: string]: any;
+        session: any;
         secret?: string | undefined;
     }) => Promise<{
         createUser: (profile: Profile) => Promise<User>;
@@ -14,10 +15,10 @@ export declare const SanityAdapter: ({ client }: Options) => {
         linkAccount: (userId: string, providerId: string, providerType: string, providerAccountId: string, refreshToken: string, accessToken: string, accessTokenExpires: number) => Promise<void>;
         getUserByProviderAccountId: (providerId: string, providerAccountId: string) => Promise<any>;
         getUserByEmail: (email: string) => Promise<any>;
-        createSession: () => Promise<Session>;
-        getSession: () => Promise<Session>;
-        updateSession: () => Promise<Session>;
-        deleteSession: () => Promise<void>;
+        createSession: (user: any) => Promise<Session>;
+        getSession: (sessionToken: any) => Promise<Session | null>;
+        updateSession: (session: any, force: any) => Promise<Session | null>;
+        deleteSession: (sessionToken: any) => Promise<void>;
         updateUser: (user: User & {
             id: string;
         }) => Promise<User>;
