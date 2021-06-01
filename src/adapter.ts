@@ -162,7 +162,7 @@ export const SanityAdapter = ({ client }: Options) => {
         .fetch(getSessionBySessionToken, {
           sessionToken,
         })
-        .then((res) => ({ ...res, id: res._id }));
+        .then((res) => ({ ...res, id: res?._id }));
       if (session && session.expires < new Date()) {
         await client.delete(session.id);
         return null;
@@ -185,7 +185,7 @@ export const SanityAdapter = ({ client }: Options) => {
         .then((res) => {
           return {
             ...res,
-            id: res._id,
+            id: res?._id,
           } as any;
         });
     }
@@ -194,7 +194,7 @@ export const SanityAdapter = ({ client }: Options) => {
       await client
         .fetch(getSessionBySessionToken, { sessionToken })
         .then(async (res) => {
-          await client.delete(res._id);
+          await client.delete(res?._id);
         });
     }
 
