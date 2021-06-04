@@ -23,6 +23,10 @@ export const getVerificationRequestQuery = groq`
   *[_type == 'verification-request' && identifier == $identifier && token == $token][0]
 `;
 
+export const getAllIdentifierVerificationRequestQuery = groq`
+  *[_type == 'verification-request' && identifier == $identifier]
+`;
+
 export const getSessionBySessionToken = groq`
   *[_type == 'session' && sessionToken == $sessionToken][0]
 `;

@@ -5,6 +5,7 @@ import {
   getUserByProviderAccountIdQuery,
   getUserByEmailQuery,
   getVerificationRequestQuery,
+  getAllIdentifierVerificationRequestQuery,
   getSessionBySessionToken,
 } from './queries';
 import LRU from 'lru-cache';
@@ -226,6 +227,29 @@ export const SanityAdapter = ({ client }: Options) => {
       _: any,
       provider: any
     ) {
+      if (client.clientConfig) {
+        // INVALIDATES PREVIOUS REQUESTS
+        await fetch(
+          `https://${client.clientConfig.projectId}.api.sanity.io/v2021-03-25/data/mutate/${client.clientConfig.dataset}`,
+          {
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: 'Bearer ' + client.clientConfig.token,
+            },
+            method: 'post',
+            body: JSON.stringify({
+              mutations: [
+                {
+                  delete: {
+                    query: `*[_type == 'verification-request' && identifier == "${_req.query.identifier}"]`,
+                  },
+                },
+              ],
+            }),
+          }
+        );
+      }
+
       await client.create({
         _type: 'verification-request',
         identifier,
