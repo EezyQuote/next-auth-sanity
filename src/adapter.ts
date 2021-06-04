@@ -241,7 +241,7 @@ export const SanityAdapter = ({ client }: Options) => {
               mutations: [
                 {
                   delete: {
-                    query: `*[_type == 'verification-request' && identifier == "${_req.query.identifier}"]`,
+                    query: `*[_type == 'verification-request' && identifier == "${identifier}"]`,
                   },
                 },
               ],
