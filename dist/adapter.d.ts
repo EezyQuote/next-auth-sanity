@@ -24,7 +24,7 @@ export declare const SanityAdapter: ({ client }: Options) => {
         }) => Promise<User>;
         createVerificationRequest: (identifier: string, url: string, token: string, _: any, provider: any) => Promise<void>;
         getVerificationRequest: (identifier?: string, token?: string) => Promise<any>;
-        deleteVerificationRequest: (identifier?: string, token?: string) => Promise<void>;
+        deleteVerificationRequest: (identifier?: string, _token?: string) => Promise<void>;
     }>;
 };
 export {};

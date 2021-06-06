@@ -259,14 +259,39 @@ export const SanityAdapter = ({ client }: Options) => {
         return null;
       }
 
-      if (client.clientConfig) {
+      return verificationRequest;
+    }
+
+    async function deleteVerificationRequest(identifier = '', _token = '') {
+      //? IF you do not want to invalidate previous requests, then you would use this commented code:
+      // const hashedToken = hashToken(token);
+
+      // const verificationRequest = await client.fetch(
+      //   getVerificationRequestQuery,
+      //   {
+      //     identifier,
+      //     token: hashedToken,
+      //   }
+      // );
+
+      // if (verificationRequest._id) {
+      //   await client.delete(verificationRequest._id);
+      // }
+
+      // We want to invalidate all verification requests if successfully logged in:
+      await deleteAllVerificationRequests(identifier);
+    }
+
+    async function deleteAllVerificationRequests(identifier = '') {
+      const config = client.config();
+      if (config) {
         // INVALIDATES PREVIOUS REQUESTS
         await fetch(
-          `https://${client.clientConfig.projectId}.api.sanity.io/v2021-03-25/data/mutate/${client.clientConfig.dataset}`,
+          `https://${config.projectId}.api.sanity.io/v2021-03-25/data/mutate/${config.dataset}`,
           {
             headers: {
               'Content-Type': 'application/json',
-              Authorization: 'Bearer ' + client.clientConfig.token,
+              Authorization: 'Bearer ' + config.token,
             },
             method: 'post',
             body: JSON.stringify({
@@ -280,24 +305,8 @@ export const SanityAdapter = ({ client }: Options) => {
             }),
           }
         );
-      }
-
-      return verificationRequest;
-    }
-
-    async function deleteVerificationRequest(identifier = '', token = '') {
-      const hashedToken = hashToken(token);
-
-      const verificationRequest = await client.fetch(
-        getVerificationRequestQuery,
-        {
-          identifier,
-          token: hashedToken,
-        }
-      );
-
-      if (verificationRequest._id) {
-        await client.delete(verificationRequest._id);
+      } else {
+        throw new Error('Sanity config is not set');
       }
     }
 
