@@ -254,7 +254,10 @@ export const SanityAdapter = ({ client }: Options) => {
         }
       );
 
-      if (verificationRequest && verificationRequest.expires < new Date()) {
+      if (
+        verificationRequest &&
+        new Date(verificationRequest.expires) < new Date()
+      ) {
         await client.delete(verificationRequest._id);
         return null;
       }
