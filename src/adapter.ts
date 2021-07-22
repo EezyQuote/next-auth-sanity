@@ -1,336 +1,224 @@
-import { Profile, Session } from 'next-auth/adapters';
-import { User } from 'next-auth';
+import { Profile, Session } from "next-auth";
+import { Adapter } from "next-auth/adapters";
+import { User } from "next-auth";
 import {
   getUserByIdQuery,
   getUserByProviderAccountIdQuery,
   getUserByEmailQuery,
   getVerificationRequestQuery,
-  getAllIdentifierVerificationRequestQuery,
-  getSessionBySessionToken,
-} from './queries';
-import LRU from 'lru-cache';
-import { SanityClient } from '@sanity/client';
-import { uuid } from '@sanity/uuid';
-import { createHash, randomBytes } from 'crypto';
+} from "./queries";
+import { SanityClient } from "@sanity/client";
+import { uuid } from "@sanity/uuid";
+import argon2 from "argon2";
 
-type Options = {
-  client: SanityClient;
-};
+/**
+ * @option client - The Sanity client instance
+ * @option newProfileDefaults - Default values for a new profile
+ *
+ **/
+export const SanityAdapter: Adapter<
+  { client: SanityClient; newProfileDefaults?: Record<string, any> },
+  never,
+  User & { id: string },
+  Profile,
+  Session
+> = ({ client, newProfileDefaults = {} }) => {
+  return {
+    async getAdapter({ secret, logger, ...appOptions }) {
+      if (!appOptions.jwt) {
+        logger.warn("this adapter only work with jwt");
+      }
 
-const userCache = new LRU<string, User & { id: string }>({
-  maxAge: 24 * 60 * 60 * 1000,
-  max: 1000,
-});
-
-export const SanityAdapter = ({ client }: Options) => {
-  const getAdapter = async ({
-    session,
-    secret = 'this-is-a-secret-value-with-at-least-32-characters',
-    ...appOptions
-  }) => {
-    const sessionMaxAge = session.maxAge * 1000; // default is 30 days
-    const sessionUpdateAge = session.updateAge * 1000; // default is 1 day
-
-    const hashToken = (token: string) => {
-      return createHash('sha256').update(`${token}${secret}`).digest('hex');
-    };
-
-    async function createUser(profile: Profile): Promise<User> {
-      const user = await client.create({
-        _id: `user.${uuid()}`,
-        _type: 'user',
-        email: profile.email,
-        name: profile.name,
-        image: profile.image,
-      });
-
-      userCache.set(user._id, {
-        ...user,
-        id: user._id,
-      });
+      const hashToken = (token: string) => argon2.hash(`${token}${secret}`);
 
       return {
-        ...user,
-        id: user._id,
-      };
-    }
+        displayName: "Sanity",
+        async createUser(profile) {
+          const user = await client.create({
+            _id: `user.${uuid()}`,
+            _type: "user",
+            email: profile.email,
+            name: profile.name,
+            image: profile.image,
+            ...newProfileDefaults,
+          });
 
-    async function getUser(id: string): Promise<User> {
-      const cachedUser = userCache.get(id);
+          return {
+            id: user._id,
+            ...user,
+          };
+        },
 
-      if (cachedUser) {
-        (async () => {
+        async getUser(id) {
           const user = await client.fetch(getUserByIdQuery, {
             id,
           });
 
-          userCache.set(user._id, {
+          if (!user) return null;
+
+          return {
             ...user,
             id: user._id,
-          });
-        })();
-
-        return cachedUser;
-      }
-
-      const user = await client.fetch(getUserByIdQuery, {
-        id,
-      });
-
-      return {
-        ...user,
-        id: user._id,
-      };
-    }
-
-    async function linkAccount(
-      userId: string,
-      providerId: string,
-      providerType: string,
-      providerAccountId: string,
-      refreshToken: string,
-      accessToken: string,
-      accessTokenExpires: number
-    ): Promise<void> {
-      await client.create({
-        _type: 'account',
-        providerId,
-        providerType,
-        providerAccountId: `${providerAccountId}`,
-        refreshToken,
-        accessToken,
-        accessTokenExpires,
-        user: {
-          _type: 'reference',
-          _ref: userId,
+          };
         },
-      });
-    }
 
-    async function getUserByProviderAccountId(
-      providerId: string,
-      providerAccountId: string
-    ) {
-      const account = await client
-        .fetch(getUserByProviderAccountIdQuery, {
+        async linkAccount(
+          userId,
           providerId,
-          providerAccountId: String(providerAccountId),
-        })
-        .then((res) => {
-          if (!res) return res;
-          return {
-            ...res,
+          providerType,
+          providerAccountId,
+          refreshToken,
+          accessToken,
+          accessTokenExpires
+        ) {
+          await client.create({
+            _type: "account",
+            providerId,
+            providerType,
+            providerAccountId: `${providerAccountId}`,
+            refreshToken,
+            accessToken,
+            accessTokenExpires,
             user: {
-              ...res.user,
-              id: res?.user?._id,
+              _type: "reference",
+              _ref: userId,
             },
-          };
-        });
+          });
+        },
 
-      return account?.user;
-    }
+        async getUserByProviderAccountId(providerId, providerAccountId) {
+          const account = await client.fetch(getUserByProviderAccountIdQuery, {
+            providerId,
+            providerAccountId: String(providerAccountId),
+          });
 
-    async function getUserByEmail(email: string) {
-      const user = await client
-        .fetch(getUserByEmailQuery, {
-          email,
-        })
-        .then((res) => {
-          if (!res) return res;
+          if (!account) return null;
+
           return {
-            ...res,
-            id: res._id,
+            id: account?.user._id,
+            ...account?.user,
           };
-        });
+        },
 
-      return user;
-    }
+        async getUserByEmail(email: string) {
+          if (!email) return null;
 
-    function createSession(user): Promise<Session> {
-      return client
-        .create({
-          _type: 'session',
-          userId: user.id,
-          expires: new Date(Date.now() + sessionMaxAge),
-          sessionToken: randomBytes(32).toString('hex'),
-          accessToken: randomBytes(32).toString('hex'),
-        })
-        .then((res) => ({ ...res, id: res._id }));
-    }
+          const user = await client.fetch(getUserByEmailQuery, {
+            email,
+          });
 
-    async function getSession(sessionToken): Promise<Session | null> {
-      const session = await client
-        .fetch(getSessionBySessionToken, {
-          sessionToken,
-        })
-        .then((res) => ({ ...res, id: res?._id }));
-      if (session && session.expires < new Date()) {
-        await client.delete(session.id);
-        return null;
-      }
-      return session;
-    }
+          if (!user) return null;
 
-    async function updateSession(session, force): Promise<Session | null> {
-      if (
-        !force &&
-        Number(session.expires) - sessionMaxAge + sessionUpdateAge > Date.now()
-      ) {
-        return null;
-      }
-
-      return client
-        .patch(session.id)
-        .set({ expires: new Date(Date.now() + sessionMaxAge) })
-        .commit()
-        .then((res) => {
           return {
-            ...res,
-            id: res?._id,
-          } as any;
-        });
-    }
-
-    async function deleteSession(sessionToken) {
-      await client
-        .fetch(getSessionBySessionToken, { sessionToken })
-        .then(async (res) => {
-          await client.delete(res?._id);
-        });
-    }
-
-    async function updateUser(user: User & { id: string }): Promise<User> {
-      const { id, name, email, image } = user;
-
-      userCache.set(id, user);
-
-      return await client
-        .patch(id)
-        .set({
-          name,
-          email,
-          image,
-        })
-        .commit()
-        .then((res) => {
-          return {
-            ...res,
-            id: res._id,
+            id: user._id,
+            ...user,
           };
-        });
-    }
+        },
 
-    async function createVerificationRequest(
-      identifier: string,
-      url: string,
-      token: string,
-      _: any,
-      provider: any
-    ) {
-      await client.create({
-        _type: 'verification-request',
-        identifier,
-        token: hashToken(token),
-        expires: new Date(Date.now() + provider.maxAge * 1000),
-      });
+        async createSession() {
+          logger.warn("[createSession] method not implemented");
 
-      await provider.sendVerificationRequest({
-        identifier,
-        url,
-        token,
-        baseUrl: appOptions.baseUrl,
-        provider,
-      });
-    }
+          return {} as any;
+        },
 
-    async function getVerificationRequest(identifier = '', token = '') {
-      const hashedToken = hashToken(token);
+        async getSession() {
+          logger.warn("[getSession] method not implemented");
+          return {} as any;
+        },
 
-      const verificationRequest = await client.fetch(
-        getVerificationRequestQuery,
-        {
-          identifier,
-          token: hashedToken,
-        }
-      );
+        async updateSession() {
+          logger.warn("[updateSession] method not implemented");
+          return {} as any;
+        },
 
-      if (
-        verificationRequest &&
-        new Date(verificationRequest.expires) < new Date()
-      ) {
-        await client.delete(verificationRequest._id);
-        return null;
-      }
+        async deleteSession() {
+          logger.warn("[deleteSession] method not implemented");
+        },
 
-      return verificationRequest;
-    }
+        async updateUser(user) {
+          const { id, name, email, image } = user;
 
-    async function deleteVerificationRequest(identifier = '', _token = '') {
-      //? IF you do not want to invalidate previous requests, then you would use this commented code:
-      // const hashedToken = hashToken(token);
+          const newUser = await client
+            .patch(id)
+            .set({
+              name,
+              email,
+              image,
+            })
+            .commit();
 
-      // const verificationRequest = await client.fetch(
-      //   getVerificationRequestQuery,
-      //   {
-      //     identifier,
-      //     token: hashedToken,
-      //   }
-      // );
+          return {
+            id: newUser._id,
+            ...newUser,
+          };
+        },
 
-      // if (verificationRequest._id) {
-      //   await client.delete(verificationRequest._id);
-      // }
+        async createVerificationRequest(identifier, url, token, _, provider) {
+          await client.create({
+            _type: "verification-request",
+            identifier,
+            token: await hashToken(token),
+            expires: new Date(Date.now() + provider.maxAge * 1000),
+          });
 
-      // We want to invalidate all verification requests if successfully logged in:
-      await deleteAllVerificationRequests(identifier);
-    }
+          await provider.sendVerificationRequest({
+            identifier,
+            token,
+            url,
+            baseUrl: appOptions.baseUrl,
+            provider,
+          });
+        },
 
-    async function deleteAllVerificationRequests(identifier = '') {
-      const config = client.config();
-      if (config) {
-        // INVALIDATES PREVIOUS REQUESTS
-        await fetch(
-          `https://${config.projectId}.api.sanity.io/v2021-03-25/data/mutate/${config.dataset}`,
-          {
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: 'Bearer ' + config.token,
-            },
-            method: 'post',
-            body: JSON.stringify({
-              mutations: [
-                {
-                  delete: {
-                    query: `*[_type == 'verification-request' && identifier == "${identifier}"]`,
-                  },
-                },
-              ],
-            }),
+        async deleteVerificationRequest(identifier, token) {
+          const verificationRequest = await client.fetch(
+            getVerificationRequestQuery,
+            {
+              identifier,
+            }
+          );
+
+          if (!verificationRequest) return;
+
+          const checkToken = await argon2.verify(
+            verificationRequest.token,
+            `${token}${secret}`
+          );
+
+          if (!checkToken) return;
+
+          await client.delete(verificationRequest._id);
+        },
+
+        async getVerificationRequest(identifier, token) {
+          const verificationRequest = await client.fetch(
+            getVerificationRequestQuery,
+            {
+              identifier,
+            }
+          );
+
+          if (!verificationRequest) return null;
+
+          const checkToken = await argon2.verify(
+            verificationRequest.token,
+            `${token}${secret}`
+          );
+
+          if (!checkToken) return null;
+
+          if (verificationRequest.expires < new Date()) {
+            await client.delete(verificationRequest._id);
+
+            return null;
           }
-        );
-      } else {
-        throw new Error('Sanity config is not set');
-      }
-    }
 
-    return {
-      createUser,
-      getUser,
-      linkAccount,
-      getUserByProviderAccountId,
-      getUserByEmail,
-      createSession,
-      getSession,
-      updateSession,
-      deleteSession,
-      updateUser,
-      createVerificationRequest,
-      getVerificationRequest,
-      deleteVerificationRequest,
-    };
-  };
-
-  return {
-    getAdapter,
+          return {
+            id: verificationRequest._id,
+            ...verificationRequest,
+          };
+        },
+      };
+    },
   };
 };

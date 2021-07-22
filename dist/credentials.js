@@ -8,7 +8,7 @@ const providers_1 = __importDefault(require("next-auth/providers"));
 const queries_1 = require("./queries");
 const argon2_1 = __importDefault(require("argon2"));
 const uuid_1 = require("@sanity/uuid");
-const signUpHandler = async ({ req, client, res }) => {
+const signUpHandler = (client) => async (req, res) => {
     const { email, password, name, image } = req.body;
     const user = await client.fetch(queries_1.getUserByEmailQuery, {
         email
@@ -32,9 +32,10 @@ const signUpHandler = async ({ req, client, res }) => {
     });
 };
 exports.signUpHandler = signUpHandler;
-const SanityCredentials = ({ client }) => providers_1.default.Credentials({
+const SanityCredentials = (client) => providers_1.default.Credentials({
+    name: 'Credentials',
+    id: 'sanity-login',
     credentials: {
-        name: 'Credentials',
         email: {
             label: 'Email',
             type: 'text'
@@ -44,13 +45,13 @@ const SanityCredentials = ({ client }) => providers_1.default.Credentials({
             type: 'password'
         }
     },
-    async authorize({ email, password }) {
+    async authorize(credentials) {
         const user = await client.fetch(queries_1.getUserByEmailQuery, {
-            email
+            email: credentials.email
         });
         if (!user)
             throw new Error('Email does not exist');
-        if (await argon2_1.default.verify(user.password, password)) {
+        if (await argon2_1.default.verify(user.password, credentials.password)) {
             return {
                 email: user.email,
                 name: user.name,
