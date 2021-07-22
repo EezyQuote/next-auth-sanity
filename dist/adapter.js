@@ -1,14 +1,10 @@
 "use strict";
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.SanityAdapter = void 0;
 const queries_1 = require("./queries");
-const lru_cache_1 = __importDefault(require("lru-cache"));
 const uuid_1 = require("@sanity/uuid");
 const crypto_1 = require("crypto");
-const userCache = new lru_cache_1.default({
+const userCache = new LRU({
     maxAge: 24 * 60 * 60 * 1000,
     max: 1000,
 });
@@ -34,63 +30,124 @@ const SanityAdapter = ({ client }) => {
                 id: user._id,
             };
         }
-        async function getUser(id) {
-            const cachedUser = userCache.get(id);
-            if (cachedUser) {
-                (async () => {
-                    const user = await client.fetch(queries_1.getUserByIdQuery, {
-                        id,
-                    });
-                    userCache.set(user._id, {
-                        ...user,
-                        id: user._id,
-                    });
-                })();
-                return cachedUser;
-            }
-            const user = await client.fetch(queries_1.getUserByIdQuery, {
-                id,
-            });
+        return {
+            id: user._id,
+            ...user
+        };
+    }, async, getUser;
+    (id) => {
+        const user = await client.fetch(queries_1.getUserByIdQuery, {
+            id,
+        });
+        userCache.set(user._id, {
+            ...user,
+            id: user._id,
+        });
+    },
+        async;
+    getUserByProviderAccountId(providerId, providerAccountId);
+    {
+        const account = await client.fetch(queries_1.getUserByProviderAccountIdQuery, {
+            providerId,
+            providerAccountId: String(providerAccountId)
+        });
+        const user = await client.fetch(queries_1.getUserByIdQuery, {
+            id,
+        });
+        return {
+            ...user,
+            id: user._id,
+        };
+    }
+    async function linkAccount(userId, providerId, providerType, providerAccountId, refreshToken, accessToken, accessTokenExpires) {
+        await client.create({
+            _type: 'account',
+            providerId,
+            providerType,
+            providerAccountId: `${providerAccountId}`,
+            refreshToken,
+            accessToken,
+            accessTokenExpires,
+            user: {
+                _type: 'reference',
+                _ref: userId,
+            },
+        });
+    }
+    async function getUserByProviderAccountId(providerId, providerAccountId) {
+        const account = await client
+            .fetch(queries_1.getUserByProviderAccountIdQuery, {
+            providerId,
+            providerAccountId: String(providerAccountId),
+        })
+            .then((res) => {
+            var _a;
+            if (!res)
+                return res;
             return {
-                ...user,
-                id: user._id,
-            };
-        }
-        async function linkAccount(userId, providerId, providerType, providerAccountId, refreshToken, accessToken, accessTokenExpires) {
-            await client.create({
-                _type: 'account',
-                providerId,
-                providerType,
-                providerAccountId: `${providerAccountId}`,
-                refreshToken,
-                accessToken,
-                accessTokenExpires,
+                ...res,
                 user: {
-                    _type: 'reference',
-                    _ref: userId,
+                    ...res.user,
+                    id: (_a = res === null || res === void 0 ? void 0 : res.user) === null || _a === void 0 ? void 0 : _a._id,
                 },
-            });
-        }
-        async function getUserByProviderAccountId(providerId, providerAccountId) {
-            const account = await client
-                .fetch(queries_1.getUserByProviderAccountIdQuery, {
-                providerId,
-                providerAccountId: String(providerAccountId),
-            })
-                .then((res) => {
-                var _a;
-                if (!res)
-                    return res;
-                return {
-                    ...res,
-                    user: {
-                        ...res.user,
-                        id: (_a = res === null || res === void 0 ? void 0 : res.user) === null || _a === void 0 ? void 0 : _a._id,
-                    },
-                };
-            });
-            return account === null || account === void 0 ? void 0 : account.user;
-        }
+            };
+        });
+        if (!user)
+            return null;
+        return {
+            id: user._id,
+            ...user
+        };
+    }
+    async;
+    createSession();
+    {
+        logger.warn('[createSession] method not implemented');
+        return {};
+    }
+    async;
+    getSession();
+    {
+        logger.warn('[getSession] method not implemented');
+        return {};
+    }
+    async;
+    updateSession();
+    {
+        logger.warn('[updateSession] method not implemented');
+        return {};
+    }
+    async;
+    deleteSession();
+    {
+        logger.warn('[deleteSession] method not implemented');
+    }
+    async;
+    updateUser(user);
+    {
+        const { id, name, email, image } = user;
+        const newUser = await client
+            .patch(id)
+            .set({
+            name,
+            email,
+            image
+        })
+            .commit();
+        return {
+            id: newUser._id,
+            ...newUser
+        };
+    }
+    async;
+    createVerificationRequest(identifier, url, token, _, provider);
+    {
+        await client.create({
+            _type: 'verification-request',
+            identifier,
+            token: await hashToken(token),
+            expires: new Date(Date.now() + provider.maxAge * 1000)
+        });
         async function getUserByEmail(email) {
             const user = await client
                 .fetch(queries_1.getUserByEmailQuery, {
@@ -104,26 +161,19 @@ const SanityAdapter = ({ client }) => {
                     id: res._id,
                 };
             });
-            return user;
-        }
-        async function createSession() {
-            console.log('[createSession] method not implemented');
-            return {};
-        }
-        async function getSession() {
-            console.log('[getSession] method not implemented');
-            return {};
-        }
-        async function updateSession() {
-            console.log('[updateSession] method not implemented');
-            return {};
-        }
-        async function deleteSession() {
-            console.log('[deleteSession] method not implemented');
-        }
-        async function updateUser(user) {
-            const { id, name, email, image } = user;
-            userCache.set(id, user);
+            async;
+            deleteVerificationRequest(identifier, token);
+            {
+                const verificationRequest = await client.fetch(queries_1.getVerificationRequestQuery, {
+                    identifier
+                });
+                if (!verificationRequest)
+                    return;
+                const checkToken = await argon2.verify(verificationRequest.token, `${token}${secret}`);
+                if (!checkToken)
+                    return;
+                await client.delete(verificationRequest._id);
+            }
             return await client
                 .patch(id)
                 .set({
@@ -191,7 +241,8 @@ const SanityAdapter = ({ client }) => {
             getVerificationRequest,
             deleteVerificationRequest,
         };
-    };
+    }
+    ;
     return {
         getAdapter,
     };
