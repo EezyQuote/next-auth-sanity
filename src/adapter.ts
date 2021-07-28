@@ -9,7 +9,9 @@ import {
 } from "./queries";
 import { SanityClient } from "@sanity/client";
 import { uuid } from "@sanity/uuid";
-import argon2 from "argon2";
+import bcrypt from "bcrypt";
+
+const saltRounds = 10;
 
 /**
  * @option client - The Sanity client instance
@@ -29,7 +31,8 @@ export const SanityAdapter: Adapter<
         logger.warn("this adapter only work with jwt");
       }
 
-      const hashToken = (token: string) => argon2.hash(`${token}${secret}`);
+      const hashToken = (token: string) =>
+        bcrypt.hash(`${token}${secret}`, saltRounds);
 
       return {
         displayName: "Sanity",
@@ -180,9 +183,9 @@ export const SanityAdapter: Adapter<
 
           if (!verificationRequest) return;
 
-          const checkToken = await argon2.verify(
-            verificationRequest.token,
-            `${token}${secret}`
+          const checkToken = await bcrypt.compare(
+            `${token}${secret}`,
+            verificationRequest.token
           );
 
           if (!checkToken) return;
@@ -200,9 +203,9 @@ export const SanityAdapter: Adapter<
 
           if (!verificationRequest) return null;
 
-          const checkToken = await argon2.verify(
-            verificationRequest.token,
-            `${token}${secret}`
+          const checkToken = await bcrypt.compare(
+            `${token}${secret}`,
+            verificationRequest.token
           );
 
           if (!checkToken) return null;

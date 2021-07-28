@@ -6,7 +6,8 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.SanityAdapter = void 0;
 const queries_1 = require("./queries");
 const uuid_1 = require("@sanity/uuid");
-const argon2_1 = __importDefault(require("argon2"));
+const bcrypt_1 = __importDefault(require("bcrypt"));
+const saltRounds = 10;
 /**
  * @option client - The Sanity client instance
  * @option newProfileDefaults - Default values for a new profile
@@ -18,7 +19,7 @@ const SanityAdapter = ({ client, newProfileDefaults = {} }) => {
             if (!appOptions.jwt) {
                 logger.warn("this adapter only work with jwt");
             }
-            const hashToken = (token) => argon2_1.default.hash(`${token}${secret}`);
+            const hashToken = (token) => bcrypt_1.default.hash(`${token}${secret}`, saltRounds);
             return {
                 displayName: "Sanity",
                 async createUser(profile) {
@@ -137,7 +138,7 @@ const SanityAdapter = ({ client, newProfileDefaults = {} }) => {
                     });
                     if (!verificationRequest)
                         return;
-                    const checkToken = await argon2_1.default.verify(verificationRequest.token, `${token}${secret}`);
+                    const checkToken = await bcrypt_1.default.compare(`${token}${secret}`, verificationRequest.token);
                     if (!checkToken)
                         return;
                     await client.delete(verificationRequest._id);
@@ -148,7 +149,7 @@ const SanityAdapter = ({ client, newProfileDefaults = {} }) => {
                     });
                     if (!verificationRequest)
                         return null;
-                    const checkToken = await argon2_1.default.verify(verificationRequest.token, `${token}${secret}`);
+                    const checkToken = await bcrypt_1.default.compare(`${token}${secret}`, verificationRequest.token);
                     if (!checkToken)
                         return null;
                     if (verificationRequest.expires < new Date()) {
