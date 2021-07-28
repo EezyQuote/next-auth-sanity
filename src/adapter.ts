@@ -178,17 +178,19 @@ export const SanityAdapter: Adapter<
             getVerificationRequestQuery,
             {
               identifier,
+              token: await hashToken(token),
             }
           );
 
           if (!verificationRequest) return;
 
-          const checkToken = await bcrypt.compare(
-            `${token}${secret}`,
-            verificationRequest.token
-          );
+          // REMOVED BECAUSE WE COMPARE THE HASHED TOKENS IN THE QUERY
+          // const checkToken = await bcrypt.compare(
+          //   `${token}${secret}`,
+          //   verificationRequest.token
+          // );
 
-          if (!checkToken) return;
+          // if (!checkToken) return;
 
           await client.delete(verificationRequest._id);
         },
@@ -198,17 +200,19 @@ export const SanityAdapter: Adapter<
             getVerificationRequestQuery,
             {
               identifier,
+              token: await hashToken(token),
             }
           );
 
           if (!verificationRequest) return null;
 
-          const checkToken = await bcrypt.compare(
-            `${token}${secret}`,
-            verificationRequest.token
-          );
+          // REMOVED BECAUSE WE COMPARE THE HASHED TOKENS IN THE QUERY
+          // const checkToken = await bcrypt.compare(
+          //   `${token}${secret}`,
+          //   verificationRequest.token
+          // );
 
-          if (!checkToken) return null;
+          // if (!checkToken) return null;
 
           if (verificationRequest.expires < new Date()) {
             await client.delete(verificationRequest._id);

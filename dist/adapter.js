@@ -135,23 +135,31 @@ const SanityAdapter = ({ client, newProfileDefaults = {} }) => {
                 async deleteVerificationRequest(identifier, token) {
                     const verificationRequest = await client.fetch(queries_1.getVerificationRequestQuery, {
                         identifier,
+                        token: await hashToken(token),
                     });
                     if (!verificationRequest)
                         return;
-                    const checkToken = await bcrypt_1.default.compare(`${token}${secret}`, verificationRequest.token);
-                    if (!checkToken)
-                        return;
+                    // REMOVED BECAUSE WE COMPARE THE HASHED TOKENS IN THE QUERY
+                    // const checkToken = await bcrypt.compare(
+                    //   `${token}${secret}`,
+                    //   verificationRequest.token
+                    // );
+                    // if (!checkToken) return;
                     await client.delete(verificationRequest._id);
                 },
                 async getVerificationRequest(identifier, token) {
                     const verificationRequest = await client.fetch(queries_1.getVerificationRequestQuery, {
                         identifier,
+                        token: await hashToken(token),
                     });
                     if (!verificationRequest)
                         return null;
-                    const checkToken = await bcrypt_1.default.compare(`${token}${secret}`, verificationRequest.token);
-                    if (!checkToken)
-                        return null;
+                    // REMOVED BECAUSE WE COMPARE THE HASHED TOKENS IN THE QUERY
+                    // const checkToken = await bcrypt.compare(
+                    //   `${token}${secret}`,
+                    //   verificationRequest.token
+                    // );
+                    // if (!checkToken) return null;
                     if (verificationRequest.expires < new Date()) {
                         await client.delete(verificationRequest._id);
                         return null;
