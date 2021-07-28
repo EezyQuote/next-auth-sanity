@@ -134,6 +134,7 @@ const SanityAdapter = ({ client, newProfileDefaults = {} }) => {
                 async deleteVerificationRequest(identifier, token) {
                     const verificationRequest = await client.fetch(queries_1.getVerificationRequestQuery, {
                         identifier,
+                        token,
                     });
                     if (!verificationRequest)
                         return;
@@ -145,6 +146,7 @@ const SanityAdapter = ({ client, newProfileDefaults = {} }) => {
                 async getVerificationRequest(identifier, token) {
                     const verificationRequest = await client.fetch(queries_1.getVerificationRequestQuery, {
                         identifier,
+                        token,
                     });
                     if (!verificationRequest)
                         return null;
