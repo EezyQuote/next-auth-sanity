@@ -9,9 +9,7 @@ import {
 } from "./queries";
 import { SanityClient } from "@sanity/client";
 import { uuid } from "@sanity/uuid";
-import bcrypt from "bcrypt";
-
-const saltRounds = 10;
+import argon2 from "argon2";
 
 /**
  * @option client - The Sanity client instance
@@ -31,8 +29,7 @@ export const SanityAdapter: Adapter<
         logger.warn("this adapter only work with jwt");
       }
 
-      const hashToken = (token: string) =>
-        bcrypt.hash(`${token}${secret}`, saltRounds);
+      const hashToken = (token: string) => argon2.hash(`${token}${secret}`);
 
       return {
         displayName: "Sanity",
@@ -174,11 +171,13 @@ export const SanityAdapter: Adapter<
         },
 
         async deleteVerificationRequest(identifier, token) {
+          const hashedToken = await hashToken(token);
+
           const verificationRequest = await client.fetch(
             getVerificationRequestQuery,
             {
               identifier,
-              token: await hashToken(token),
+              token: hashedToken,
             }
           );
 
@@ -196,11 +195,13 @@ export const SanityAdapter: Adapter<
         },
 
         async getVerificationRequest(identifier, token) {
+          const hashedToken = await hashToken(token);
+
           const verificationRequest = await client.fetch(
             getVerificationRequestQuery,
             {
               identifier,
-              token: await hashToken(token),
+              token: hashedToken,
             }
           );
 
@@ -216,9 +217,10 @@ export const SanityAdapter: Adapter<
 
           if (verificationRequest.expires < new Date()) {
             await client.delete(verificationRequest._id);
-
             return null;
           }
+
+          //TODO - Invalidate all the other tokens for this user
 
           return {
             id: verificationRequest._id,
