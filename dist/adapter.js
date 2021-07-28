@@ -1,12 +1,9 @@
 "use strict";
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.SanityAdapter = void 0;
 const queries_1 = require("./queries");
 const uuid_1 = require("@sanity/uuid");
-const argon2_1 = __importDefault(require("argon2"));
+const crypto_1 = require("crypto");
 /**
  * @option client - The Sanity client instance
  * @option newProfileDefaults - Default values for a new profile
@@ -18,7 +15,9 @@ const SanityAdapter = ({ client, newProfileDefaults = {} }) => {
             if (!appOptions.jwt) {
                 logger.warn("this adapter only work with jwt");
             }
-            const hashToken = (token) => argon2_1.default.hash(`${token}${secret}`);
+            const hashToken = (token) => {
+                return crypto_1.createHash("sha256").update(`${token}${secret}`).digest("hex");
+            };
             return {
                 displayName: "Sanity",
                 async createUser(profile) {
@@ -120,7 +119,7 @@ const SanityAdapter = ({ client, newProfileDefaults = {} }) => {
                     await client.create({
                         _type: "verification-request",
                         identifier,
-                        token: await hashToken(token),
+                        token: hashToken(token),
                         expires: new Date(Date.now() + provider.maxAge * 1000),
                     });
                     await provider.sendVerificationRequest({
@@ -132,10 +131,9 @@ const SanityAdapter = ({ client, newProfileDefaults = {} }) => {
                     });
                 },
                 async deleteVerificationRequest(identifier, token) {
-                    const hashedToken = await hashToken(token);
                     const verificationRequest = await client.fetch(queries_1.getVerificationRequestQuery, {
                         identifier,
-                        token: hashedToken,
+                        token: hashToken(token),
                     });
                     if (!verificationRequest)
                         return;
@@ -148,10 +146,9 @@ const SanityAdapter = ({ client, newProfileDefaults = {} }) => {
                     await client.delete(verificationRequest._id);
                 },
                 async getVerificationRequest(identifier, token) {
-                    const hashedToken = await hashToken(token);
                     const verificationRequest = await client.fetch(queries_1.getVerificationRequestQuery, {
                         identifier,
-                        token: hashedToken,
+                        token: hashToken(token),
                     });
                     if (!verificationRequest)
                         return null;

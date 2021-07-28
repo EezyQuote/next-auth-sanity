@@ -9,7 +9,7 @@ import {
 } from "./queries";
 import { SanityClient } from "@sanity/client";
 import { uuid } from "@sanity/uuid";
-import argon2 from "argon2";
+import { createHash } from "crypto";
 
 /**
  * @option client - The Sanity client instance
@@ -29,7 +29,9 @@ export const SanityAdapter: Adapter<
         logger.warn("this adapter only work with jwt");
       }
 
-      const hashToken = (token: string) => argon2.hash(`${token}${secret}`);
+      const hashToken = (token: string) => {
+        return createHash("sha256").update(`${token}${secret}`).digest("hex");
+      };
 
       return {
         displayName: "Sanity",
@@ -157,7 +159,7 @@ export const SanityAdapter: Adapter<
           await client.create({
             _type: "verification-request",
             identifier,
-            token: await hashToken(token),
+            token: hashToken(token),
             expires: new Date(Date.now() + provider.maxAge * 1000),
           });
 
@@ -171,13 +173,11 @@ export const SanityAdapter: Adapter<
         },
 
         async deleteVerificationRequest(identifier, token) {
-          const hashedToken = await hashToken(token);
-
           const verificationRequest = await client.fetch(
             getVerificationRequestQuery,
             {
               identifier,
-              token: hashedToken,
+              token: hashToken(token),
             }
           );
 
@@ -195,13 +195,11 @@ export const SanityAdapter: Adapter<
         },
 
         async getVerificationRequest(identifier, token) {
-          const hashedToken = await hashToken(token);
-
           const verificationRequest = await client.fetch(
             getVerificationRequestQuery,
             {
               identifier,
-              token: hashedToken,
+              token: hashToken(token),
             }
           );
 
