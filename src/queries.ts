@@ -1,4 +1,4 @@
-import groq from 'groq';
+import groq from "groq";
 
 export const getUserByIdQuery = groq`
   *[_type == 'user' && _id == $id][0]
@@ -20,7 +20,7 @@ export const getUserByEmailQuery = groq`
 `;
 
 export const getVerificationRequestQuery = groq`
-  *[_type == 'verification-request' && identifier == $identifier && token == $token][0]
+  *[_type == 'verification-request' && identifier == $identifier][0]
 `;
 
 export const getAllIdentifierVerificationRequestQuery = groq`

@@ -22,7 +22,7 @@ exports.getUserByEmailQuery = groq_1.default `
   *[_type == 'user' && email == $email][0]
 `;
 exports.getVerificationRequestQuery = groq_1.default `
-  *[_type == 'verification-request' && identifier == $identifier && token == $token][0]
+  *[_type == 'verification-request' && identifier == $identifier][0]
 `;
 exports.getAllIdentifierVerificationRequestQuery = groq_1.default `
   *[_type == 'verification-request' && identifier == $identifier]

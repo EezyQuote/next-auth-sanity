@@ -175,7 +175,6 @@ export const SanityAdapter: Adapter<
             getVerificationRequestQuery,
             {
               identifier,
-              token,
             }
           );
 
@@ -196,7 +195,6 @@ export const SanityAdapter: Adapter<
             getVerificationRequestQuery,
             {
               identifier,
-              token,
             }
           );
 
